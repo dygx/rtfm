@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTFM Python App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold mb-4">RTFM Python App</h1>
+        
+        <div class="mb-4">
+            <ul class="flex border-b">
+                <li class="-mb-px mr-1">
+                    <a class="bg-white inline-block border-l border-t border-r rounded-t py-2 px-4 text-blue-700 font-semibold" href="#" onclick="showTab('csv')">Liste des machines</a>
+                </li>
+                <li class="mr-1">
+                    <a class="bg-white inline-block py-2 px-4 text-blue-500 hover:text-blue-800 font-semibold" href="#" onclick="showTab('udp')">UDP</a>
+                </li>
+                <li class="mr-1">
+                    <a class="bg-white inline-block py-2 px-4 text-blue-500 hover:text-blue-800 font-semibold" href="#" onclick="showTab('tcp')">TCP</a>
+                </li>
+                <li class="mr-1">
+                    <a class="bg-white inline-block py-2 px-4 text-blue-500 hover:text-blue-800 font-semibold" href="#" onclick="showTab('http')">HTTP</a>
+                </li>
+                <li class="mr-1">
+                    <a class="bg-white inline-block py-2 px-4 text-blue-500 hover:text-blue-800 font-semibold" href="#" onclick="showTab('ping')">Ping</a>
+                </li>
+            </ul>
+        </div>
+
+        <div id="csv-tab" class="tab-content">
+            <h2 class="text-2xl font-semibold mb-2">Liste des machines</h2>
+            <div class="mb-4">
+                <button onclick="addMachine()" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mr-2">
+                    Ajouter une machine
+                </button>
+                <input type="file" id="csv-file" accept=".csv" class="hidden" onchange="uploadCSV()">
+                <button onclick="document.getElementById('csv-file').click()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2">
+                    Uploader CSV
+                </button>
+                <button onclick="downloadCSV()" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                    Télécharger CSV
+                </button>
+            </div>
+            <table class="w-full bg-white shadow-md rounded">
+                <thead>
+                    <tr>
+                        {% for column in columns %}
+                            <th class="px-4 py-2 bg-gray-200">{{ column }}</th>
+                        {% endfor %}
+                        <th class="px-4 py-2 bg-gray-200">Online</th>
+                        <th class="px-4 py-2 bg-gray-200">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="csv-body">
+                    {% for machine in machines %}
+                        <tr>
+                            {% for column in columns %}
+                                <td class="border px-4 py-2">
+                                    {% if column.lower() == 'ip' %}
+                                        <a href="http://{{ machine[column] }}" target="_blank" class="text-blue-500 hover:underline">{{ machine[column] }}</a>
+                                    {% else %}
+                                        {{ machine[column] }}
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                            <td class="border px-4 py-2">
+                                <span class="online-status" data-ip="{{ machine.get('IP', '') }}" data-port="{{ machine.get('Port', '80') }}">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                </span>
+                            </td>
+                            <td class="border px-4 py-2">
+                                <button onclick="editMachine({{ loop.index0 }})" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-2 rounded mr-1">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="deleteMachine({{ loop.index0 }})" class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded mr-1">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <button onclick="fillAndShowUDP({{ loop.index0 }})" class="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mr-1">
+                                    <i class="fas fa-paper-plane"></i> UDP
+                                </button>
+                                <button onclick="fillAndShowTCP({{ loop.index0 }})" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mr-1">
+                                    <i class="fas fa-exchange-alt"></i> TCP
+                                </button>
+                                <button onclick="fillAndShowHTTP({{ loop.index0 }})" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-1 px-2 rounded">
+                                    <i class="fas fa-globe"></i> HTTP
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div id="udp-tab" class="tab-content hidden">
+            <h2 class="text-2xl font-semibold mb-2">Envoyer un message UDP</h2>
+            <form id="sendUdpForm" class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="udpHost">
+                        Hôte
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="udpHost" type="text" placeholder="localhost">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="udpPort">
+                        Port
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="udpPort" type="number" placeholder="5000">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="udpMessage">
+                        Message
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="udpMessage" type="text" placeholder="Message UDP">
+                </div>
+                <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Envoyer UDP
+                </button>
+            </form>
+            <div id="udpHistory" class="mt-4">
+                <h3 class="text-xl font-semibold mb-2">Historique UDP</h3>
+                <ul id="udpHistoryList" class="list-disc pl-5"></ul>
+            </div>
+        </div>
+
+        <div id="tcp-tab" class="tab-content hidden">
+            <h2 class="text-2xl font-semibold mb-2">Envoyer un message TCP</h2>
+            <form id="sendTcpForm" class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="tcpHost">
+                        Hôte
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="tcpHost" type="text" placeholder="localhost">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="tcpPort">
+                        Port
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="tcpPort" type="number" placeholder="5000">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="tcpMessage">
+                        Message
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="tcpMessage" type="text" placeholder="Message TCP">
+                </div>
+                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Envoyer TCP
+                </button>
+            </form>
+            <div id="tcpResponse" class="mt-4 p-4 bg-gray-200 rounded hidden">
+                <h3 class="font-bold">Réponse TCP :</h3>
+                <p id="tcpResponseText"></p>
+            </div>
+            <div id="tcpHistory" class="mt-4">
+                <h3 class="text-xl font-semibold mb-2">Historique TCP</h3>
+                <ul id="tcpHistoryList" class="list-disc pl-5"></ul>
+            </div>
+        </div>
+
+        <div id="http-tab" class="tab-content hidden">
+            <h2 class="text-2xl font-semibold mb-2">Envoyer une requête HTTP</h2>
+            <form id="sendHttpForm" class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="httpUrl">
+                        URL
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="httpUrl" type="text" placeholder="https://example.com">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="httpMethod">
+                        Méthode
+                    </label>
+                    <select class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="httpMethod">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="httpData">
+                        Données (pour POST)
+                    </label>
+                    <textarea class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="httpData" placeholder="{}"></textarea>
+                </div>
+                <button type="submit" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Envoyer HTTP
+                </button>
+            </form>
+            <div id="httpResponse" class="mt-4 p-4 bg-gray-200 rounded hidden">
+                <h3 class="font-bold">Réponse HTTP :</h3>
+                <p id="httpResponseText"></p>
+            </div>
+            <div id="httpHistory" class="mt-4">
+                <h3 class="text-xl font-semibold mb-2">Historique HTTP</h3>
+                <ul id="httpHistoryList" class="list-disc pl-5"></ul>
+            </div>
+        </div>
+
+        <div id="ping-tab" class="tab-content hidden">
+            <h2 class="text-2xl font-semibold mb-2">Ping</h2>
+            <form id="pingForm" class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="pingHost">
+                        Hôte
+                    </label>
+                    <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="pingHost" type="text" placeholder="example.com">
+                </div>
+                <button type="submit" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                    Ping
+                </button>
+            </form>
+            <div id="pingResult" class="mt-4 p-4 bg-gray-200 rounded">
+                <h3 class="font-bold">Résultat du ping :</h3>
+                <pre id="pingResultText" class="whitespace-pre-wrap"></pre>
+            </div>
+            <div id="pingHistory" class="mt-4">
+                <h3 class="text-xl font-semibold mb-2">Historique Ping</h3>
+                <ul id="pingHistoryList" class="list-disc pl-5"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let machines = {{ machines|tojson|safe }};
+        let columns = {{ columns|tojson|safe }};
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+        }
+
+        function addMachine() {
+            const newMachine = {};
+            for (const column of columns) {
+                newMachine[column] = prompt(`Entrez ${column}:`) || '';
+            }
+            fetch('/add_machine', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newMachine),
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success) {
+                      alert(data.message);
+                      location.reload();
+                  }
+              });
+        }
+
+        function editMachine(index) {
+            const updatedMachine = {};
+            for (const column of columns) {
+                updatedMachine[column] = prompt(`Entrez ${column}:`, machines[index][column]) || machines[index][column];
+            }
+            fetch('/update_machine', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ index: index, machine: updatedMachine }),
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success) {
+                      alert(data.message);
+                      location.reload();
+                  }
+              });
+        }
+
+        function deleteMachine(index) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer cette machine ?')) {
+                fetch(`/delete_machine/${index}`, { method: 'DELETE' })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            location.reload();
+                        }
+                    });
+            }
+        }
+
+        function uploadCSV() {
+            const file = document.getElementById('csv-file').files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            fetch('/upload_csv', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success) {
+                      alert(data.message);
+                      location.reload();
+                  }
+              });
+        }
+
+        function downloadCSV() {
+            window.location.href = '/download_csv';
+        }
+
+        function fillAndShowUDP(index) {
+        fetch(`/fill_udp/${index}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    document.getElementById('udpHost').value = data.host;
+                    document.getElementById('udpPort').value = data.port;
+                    showTab('udp');
+                }
+            });
+    }
+
+            function fillAndShowTCP(index) {
+                fetch(`/fill_tcp/${index}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            document.getElementById('tcpHost').value = data.host;
+                            document.getElementById('tcpPort').value = data.port;
+                            showTab('tcp');
+                        }
+                    });
+            }
+
+            function fillAndShowHTTP(index) {
+                fetch(`/fill_http/${index}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            document.getElementById('httpUrl').value = data.url;
+                            showTab('http');
+                        }
+                    });
+            }
+
+            document.getElementById('sendUdpForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const message = document.getElementById('udpMessage').value;
+                const host = document.getElementById('udpHost').value;
+                const port = document.getElementById('udpPort').value;
+                fetch('/send_udp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({message: message, host: host, port: port}),
+                }).then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        updateHistory('udp', `${host}:${port} - ${message}`);
+                    }
+                });
+            });
+
+    document.getElementById('sendTcpForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const message = document.getElementById('tcpMessage').value;
+        const host = document.getElementById('tcpHost').value;
+        const port = document.getElementById('tcpPort').value;
+        fetch('/send_tcp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({message: message, host: host, port: port}),
+        }).then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  alert(data.message);
+                  document.getElementById('tcpResponse').classList.remove('hidden');
+                  document.getElementById('tcpResponseText').textContent = data.response;
+                  updateHistory('tcp', `${host}:${port} - ${message}`, data.response);
+              }
+          });
+    });
+
+    document.getElementById('sendHttpForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const url = document.getElementById('httpUrl').value;
+        const method = document.getElementById('httpMethod').value;
+        const data = document.getElementById('httpData').value;
+        fetch('/send_http', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({url: url, method: method, data: data}),
+        }).then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  alert(data.message);
+                  document.getElementById('httpResponse').classList.remove('hidden');
+                  document.getElementById('httpResponseText').textContent = data.response;
+                  updateHistory('http', `${method} ${url}`, data.response);
+              }
+          });
+    });
+
+        document.getElementById('pingForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const host = document.getElementById('pingHost').value;
+            const resultText = document.getElementById('pingResultText');
+            resultText.textContent = 'Ping en cours...';
+            document.getElementById('pingResult').classList.remove('hidden');
+
+            const eventSource = new EventSource(`/ping_stream?host=${encodeURIComponent(host)}`);
+            
+            eventSource.onmessage = function(event) {
+                resultText.textContent += event.data + '\n';
+            };
+            
+            eventSource.onerror = function() {
+                eventSource.close();
+                updateHistory('ping', host, resultText.textContent);
+            };
+        });
+
+        function updateHistory(type, command, response = '') {
+            const historyList = document.getElementById(`${type}HistoryList`);
+            const listItem = document.createElement('li');
+            listItem.textContent = `${new Date().toLocaleString()} - ${command} - ${response}`;
+            historyList.insertBefore(listItem, historyList.firstChild);
+        }
+
+        function checkOnlineStatus() {
+            document.querySelectorAll('.online-status').forEach(status => {
+                const ip = status.dataset.ip;
+                const port = status.dataset.port;
+                status.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                fetch('/check_online', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ip: ip, port: port}),
+                }).then(response => response.json())
+                  .then(data => {
+                      status.textContent = data.online ? 'En ligne' : 'Hors ligne';
+                      status.classList.remove('text-green-500', 'text-red-500');
+                      status.classList.add(data.online ? 'text-green-500' : 'text-red-500');
+                  })
+                  .catch(() => {
+                      status.textContent = 'Erreur';
+                      status.classList.add('text-red-500');
+                  });
+            });
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            showTab('csv');
+            checkOnlineStatus();
+            setInterval(checkOnlineStatus, 60000); // Vérifier le statut toutes les minutes
+        });
+
+        // Téléchargement de l'historique
+        function downloadHistory(type) {
+            fetch(`/download_history?type=${type}`)
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `${type}_history.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                });
+        }
+
+        // Ajout des boutons de téléchargement d'historique pour chaque type
+        ['udp', 'tcp', 'http', 'ping'].forEach(type => {
+            const historyDiv = document.getElementById(`${type}History`);
+            const downloadButton = document.createElement('button');
+            downloadButton.textContent = "Télécharger l'historique";
+            downloadButton.className = "mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded";
+            downloadButton.onclick = () => downloadHistory(type);
+            historyDiv.appendChild(downloadButton);
+        });
+    </script>
+</body>
+</html>
+

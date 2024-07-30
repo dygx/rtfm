@@ -1,0 +1,6 @@
+nom,ip,port,notes
+marantz,192.178.1.78,23,Plein de notes voire carrément trop
+shelly,192.168.1.51,,
+shelly2,192.168.1.52,,
+box,192.168.1.1,,
+localhost,127.0.0.1,8080,waza
